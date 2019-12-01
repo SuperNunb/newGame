@@ -12,7 +12,6 @@ class Game:
         pg.init()
         pg.mixer.init()
         self.screen = pg.display.set_mode((WIDTH, HEIGHT), depth=BIT_DEPTH)
-       #self.screen = pg.display.set_mode((WIDTH, HEIGHT), depth=BIT_DEPTH, flags=pg.SCALED)
         pg.display.set_caption(TITLE)
         #pg.display.set_icon()
         self.clock = pg.time.Clock()
@@ -29,6 +28,7 @@ class Game:
         self.grappleLine = False
         setupControllers(self)
         self.freezeUpdate = None
+        self.gmovr = False
 
     def load_data(self):
         self.main_folder = path.dirname(__file__)
@@ -39,6 +39,7 @@ class Game:
                         levels.level6, levels.level7, levels.level8, levels.level9, levels.level10]
         self.map = Map(self, self.mapList[self.levelNum - 1])
         self.defineImgs()
+        pg.mixer.music.set_volume(0.25)
 
     def new(self):
         if self.wantToQuit:
@@ -63,18 +64,25 @@ class Game:
                 self.dt = self.clock.tick(FPS) / 1000
                 self.events()
                 self.update()
-                if self.transitioning: 
-                    self.draw(noUpdate=True)
-                    self.transitioning = False
-                else: self.draw()
+                if self.gmovr: return
+                #if self.transitioning: 
+                 #   self.draw(noUpdate=True)
+                  #  self.transitioning = False
+            #    else: self.draw()
+                self.draw()
 
     def events(self):
+        def powerUpEvents():
+            if "grapple" in self.avatar.inventory and len(self.grapplehook) == 0 and self.avatar.grappleCollCheck(): 
+                Grapplehook(self, vec(self.avatar.pos.x + 10, self.avatar.pos.y))
+            elif "stealth" in self.avatar.inventory:
+                self.avatar.stealth = True
+                self.avatar.last_stealth = pg.time.get_ticks() + POWERUP_TIMEOUT
         #UNHOLDABLE EVENTS
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 self.playing = False
-                self.running = False
-            
+                self.running = False    
             if event.type == pg.KEYDOWN:
                 if event.key == pg.K_SPACE:   #AVATAR JUMPING
                     self.avatar.jump()
@@ -86,17 +94,11 @@ class Game:
                 if (event.key == pg.K_z or event.key == pg.K_e) and (self.avatar.jumping == False or self.avatar.para):                           #AVATAR SHOOTING
                     self.avatar.fireBullet()
                 if event.key == pg.K_x or event.key == pg.K_f:
-                    if "grapple" in self.avatar.inventory and len(self.grapplehook) == 0 and (self.avatar.vel.y == 0 or self.avatar.vel.y == GRAVITY):
-                        Grapplehook(self, self.avatar.pos)
-                    elif "stealth" in self.avatar.inventory:
-                        self.avatar.stealth = True
-                        self.avatar.last_stealth = pg.time.get_ticks() + POWERUP_TIMEOUT
+                    powerUpEvents()
                 if event.key == pg.K_r:
                     self.restart()
                 if event.key == pg.K_p or event.key == pg.K_ESCAPE:
                     self.pause()
-                if event.key == pg.K_g: 
-                    self.game_over()
             if event.type == pg.KEYUP:
                 if event.key == pg.K_SPACE:
                     self.avatar.jumpCut()
@@ -105,13 +107,18 @@ class Game:
             if event.type == pg.JOYBUTTONUP:
                 if event.button == 0:
                     self.avatar.jumpCut()
+                if event.button == 1:
+                    self.avatar.crouching = False
             if event.type == pg.JOYBUTTONDOWN:
                 if event.button == 0:
                     self.avatar.jump()
                 if event.button == 2 and (self.avatar.jumping == False or self.avatar.para):
                     self.avatar.fireBullet()
+                if event.button == 1:
+                    self.avatar.crouching = True
                 if event.button == 3:
                     if self.avatar.nearElevator: self.avatar.tryElevator = True
+                    else: powerUpEvents()
  
         #HOLDABLE EVENTS
         self.avatar.acc.x = 0
@@ -136,6 +143,7 @@ class Game:
     def update(self):
         self.all_sprites.update()
         self.camera.update(self.avatar)
+        if self.gmovr: return
         self.all_collisions()
 
     def draw(self, noUpdate=False):
@@ -143,16 +151,26 @@ class Game:
         self.screen.blit(self.background, self.camera.apply(pg.Rect(0, 0, self.map.pixelWidth, self.map.pixelHeight), isRect=True))
         for sprite in self.floors:
             self.screen.blit(sprite.image, self.camera.apply(sprite))
-        for sprite in self.statics:
+        for sprite in self.walls:
+            self.screen.blit(sprite.image, self.camera.apply(sprite))
+        for sprite in self.powerUps:
+            self.screen.blit(sprite.image, self.camera.apply(sprite))
+        for sprite in self.sensors:
+            self.screen.blit(sprite.image, self.camera.apply(sprite))
+        for sprite in self.powerUps:
+            self.screen.blit(sprite.image, self.camera.apply(sprite))
+        for sprite in self.depthStatics:
+            self.screen.blit(sprite.image, self.camera.apply(sprite))
+        for sprite in self.decor:
             self.screen.blit(sprite.image, self.camera.apply(sprite))
         for sprite in self.kinetics:
             self.screen.blit(sprite.image, self.camera.apply(sprite))
-        #self.screen.blit(self.fog, (0,0), special_flags=pg.BLEND_MULT)
         self.drawTempLines()
         #self.drawVFX()
-        self.drawGrid()
+        #self.drawGrid()
         self.hud()
-        if not noUpdate: pg.display.flip()
+        if not noUpdate: 
+            pg.display.flip()
 
     def drawGrid(self):
         for x in range(0, self.map.pixelWidth, TILESIZE):
@@ -169,14 +187,18 @@ class Game:
         tempSurf.set_alpha(32)
         self.screen.blit(tempSurf, (0,0))
 
-    def defineImgs(self):
-        self.backgroundSlice = pg.image.load(path.join(self.img_folder, 'backgroundSlice.png'))
-        self.background = pg.Surface((self.backgroundSlice.get_width(), self.backgroundSlice.get_height()))
-        i = 1
-        while i <= self.map.pixelHeight / self.backgroundSlice.get_height():
-            self.background.blit(self.backgroundSlice, pg.Rect(0, i * self.backgroundSlice.get_height(), self.backgroundSlice.get_width(), self.backgroundSlice.get_height()))
+    def connectBgSlices(self):
+        bgSlice = pg.image.load(path.join(self.img_folder, 'backgroundSlice.png'))
+        sliceNum = self.map.tileHeight / 6
+        self.background = pg.Surface((bgSlice.get_width(), bgSlice.get_height() * sliceNum))
+        i = 0
+        while i <= sliceNum:
+            self.background.blit(bgSlice, (0, i * bgSlice.get_height()))
             i += 1
         self.background = pg.transform.scale(self.background, (self.map.pixelWidth, self.map.pixelHeight))
+
+    def defineImgs(self):
+        self.connectBgSlices()
         self.background = self.background.convert(BIT_DEPTH)
         self.statics_sheet = Spritesheet(self, "statics.png")
         self.avatar_sheet = Spritesheet(self, "avatars.png")
@@ -186,13 +208,17 @@ class Game:
         self.wall0Img = self.statics_sheet.getImage(0,0,12,12)
         self.wall1Img = self.statics_sheet.getImage(12,0,12,12)
         self.wall2Img= self.statics_sheet.getImage(24,0,12,12)
+        
         self.floor0Img = self.statics_sheet.getImage(0,12,12,12)
         self.floor1Img = self.statics_sheet.getImage(12,12,12,12)
+        
         self.doorFirstImg = self.statics_sheet.getImage(0,24,12,36,48,144)
         self.doorFinalImg = self.statics_sheet.getImage(24,24,12,36,48,144)
+        
         self.windowImg = self.statics_sheet.getImage(36,24,12,36,48,144)
-        self.windowGoneImg = self.statics_sheet.getImage(36,24,12,36,48,144)
-        self.windowCrackedImg = self.statics_sheet.getImage(36,24,12,36,48,144)
+        self.windowGoneImg = self.statics_sheet.getImage(60,24,12,36,48,144)
+        self.windowCrackedImg = self.statics_sheet.getImage(48,24,12,36,48,144)
+        
         self.avatarIdle0Img = self.avatar_sheet.getImage(0,33,12,30,36,90)
         self.avatarIdle1Img = self.avatar_sheet.getImage(0,66,12,30,36,90)
         self.avatarRightJump0Img = self.avatar_sheet.getImage(14,33,16,27,48,81)
@@ -203,9 +229,9 @@ class Game:
         self.avatarRightRun1Img = self.avatar_sheet.getImage(30,66,16,30,48,90)
         self.avatarRightRun2Img = self.avatar_sheet.getImage(46,66,16,30,48,90)
         self.avatarRightRun3Img = self.avatar_sheet.getImage(62,66,14,30,42,90)
-        self.avatarRightCrouchImg = self.avatar_sheet.getImage(64,33,16,23,48,69)
+        self.avatarRightCrouchImg = self.avatar_sheet.getImage(31,99,14,24,42,70)
         self.avatarRightShoot0Img = self.avatar_sheet.getImage(0,99,16,30,48,90)
-        self.avatarRightShoot1Img = self.avatar_sheet.getImage(16,99,15,30,45,90)
+        self.avatarRightGrappleImg = self.avatar_sheet.getImage(16,99,15,30,45,90)
         self.avatarLeftJump0Img = pg.transform.flip(self.avatarRightJump0Img, True, False)
         self.avatarLeftJump1Img = pg.transform.flip(self.avatarRightJump1Img, True, False)
         self.avatarLeftJump2Img = pg.transform.flip(self.avatarRightJump2Img, True, False)
@@ -216,15 +242,30 @@ class Game:
         self.avatarLeftRun3Img = pg.transform.flip(self.avatarRightRun3Img, True, False)
         self.avatarLeftCrouchImg = pg.transform.flip(self.avatarRightCrouchImg, True, False)
         self.avatarLeftShoot0Img = pg.transform.flip(self.avatarRightShoot0Img, True, False)
-        self.avatarLeftShoot1Img = pg.transform.flip(self.avatarRightShoot1Img, True, False)
+        self.avatarLeftGrappleImg = pg.transform.flip(self.avatarRightGrappleImg, True, False)
+        
         self.bigBaddLeft0Img = self.baddie_sheet.getImage(0,0,12,31,48,124)
         self.bigBaddRight0Img = pg.transform.flip(self.bigBaddLeft0Img, True, False)
+        
         self.sniperBaddLeft0Img = self.baddie_sheet.getImage(0,0,12,31,48,124)
         self.sniperBaddRight0Img = pg.transform.flip(self.sniperBaddLeft0Img, True, False)
-        self.grappleImg = self.statics_sheet.getImage(0,60,16,8,64,32)
-        self.grapplehookImg = pg.transform.rotate(self.statics_sheet.getImage(0,60,7,7,28,28), 270)
+        
+        self.groundBaddLeft0Img = self.baddie_sheet.getImage(12,0,24,11,96,44)
+        self.groundBaddRight0Img = pg.transform.flip(self.groundBaddLeft0Img, True, False)
+        
+        self.grappleImg = self.other_sheet.getImage(18,0,16,8,64,32)
+        self.grapplehookImg = pg.transform.rotate(self.other_sheet.getImage(18,0,7,7,28,28), 270)
         self.bulletImg = self.other_sheet.getImage(0,0,6,4,18,12)
         self.lifeImg = self.other_sheet.getImage(6,0,12,11,48,44)
+        self.minigunImg = self.other_sheet.getImage(34,0,12,12)
+        self.stealthImg = self.other_sheet.getImage(46,0,9,10,36,40)
+        
+        self.tableImg = self.statics_sheet.getImage(0,60,22,12,88,48)
+        self.desktopImg = self.statics_sheet.getImage(22,60,22,19,88,76)
+        self.stoolUpImg = self.statics_sheet.getImage(44,60,8,10,32,40)
+        self.stoolDownImg = self.statics_sheet.getImage(52,60,8,10,40,32)
+        self.fireExtinguisherImg = self.statics_sheet.getImage(44,70,9,17,28,68)
+
         self.depthWallImg = self.statics_sheet.getImage(48,12,12,12)
         self.depthFloorImg = self.statics_sheet.getImage(36,12,12,12)
         self.depthFloorCornerImg = self.statics_sheet.getImage(36,0,12,12)
@@ -252,11 +293,13 @@ class Game:
         self.baddies = pg.sprite.Group()
         self.bigBadds = pg.sprite.Group()
         self.sniperBadds = pg.sprite.Group()
+        self.groundBadds = pg.sprite.Group()
         self.windows = pg.sprite.Group()
         self.walls = pg.sprite.Group()
         self.depthStatics = pg.sprite.Group()
         self.elevators = pg.sprite.Group()
         self.powerUps = pg.sprite.Group()
+        self.decor = pg.sprite.Group()
 
     def setupMap(self):
         for row in range(len(self.map.data)):
@@ -289,15 +332,15 @@ class Game:
                         DepthStatic(self, col, row - 1, self.depthFloorCornerImg)
                 if tile == 1:
                     Wall(self, col, row)
-                    if len(self.map.data[row]) > col + 1:
-                        if checkCollidable(row, col + 1) == False:
+                    if len(self.map.data[row]) > col + 1 and len(self.map.data) > row + 1:
+                        if checkCollidable(row, col + 1) == False and self.map.data[row + 1][col] != 4:
                             DepthStatic(self, col + 1, row, self.depthWallImg)
                 if tile == 3:
                     self.avatar = Avatar(self, col, row)
                 if tile == 4:
                     Window(self, col, row)
-                    #DepthStatic(self, col + 1, row, self.depthWindowImg)
-                    #DepthStatic(self, col + 1, row - 1, self.depthWindowTopImg)
+                    DepthStatic(self, col + 1, row + 2, self.depthFloorCliffImg)
+                    DepthStatic(self, col + 1, row - 1, self.depthFloorSideImg)
                 if tile == 5:
                     Door(self, col, row, col)
                     if len(self.map.data[row]) > col + 1:
@@ -314,9 +357,17 @@ class Game:
                     SniperBadd(self, col,row, 1)
                 if tile == 14: 
                     SniperBadd(self, col,row, -1)
-
+                if tile == 15: 
+                    GroundBadd(self, col,row, -1)
+                if tile == 16: 
+                    GroundBadd(self, col,row, 1)
+                if 30 <= tile <= 33:
+                    CollDecor(self, col,row, tile)
+                if 34 <= tile <= 37:
+                    GhostDecor(self, col,row, tile)
+ 
     def all_collisions(self):
-        avatDoorHits = pg.sprite.spritecollide(self.avatar, self.doors, False)                     #AVATAR-DOORS
+        avatDoorHits = pg.sprite.spritecollide(self.avatar, self.doors, False)                      #AVATAR-DOORS
         if avatDoorHits:
             if self.avatar.vel.x > 0:
                 self.levelUp()
@@ -324,19 +375,19 @@ class Game:
                 self.avatar.vel.x = 0
                 self.avatar.acc.x = 0
                 self.avatar.pos.x = avatDoorHits[0].rect.x + TILESIZE
-        avatWindowHits = pg.sprite.spritecollide(self.avatar, self.windows, False)                 #AVATAR-WINDOWS
+        avatWindowHits = pg.sprite.spritecollide(self.avatar, self.windows, False)                  #AVATAR-WINDOWS
         if avatWindowHits:
             if not avatWindowHits[0].broken:
                 self.avatar.lives -= 1
             if self.avatar.vel.x > 0:
                 self.changeStageType(avatWindowHits[0])
-            avatWindowHits[0].broken = True
+            avatWindowHits[0].broken = False
             avatWindowHits[0].breaking = True
-            #avatWindowHits[0].image.fill(WHITE)
-        pg.sprite.groupcollide(self.bullets, self.obstacles, True, False)                          #BULLETS-OBSTACLES
-        pg.sprite.groupcollide(self.bullets, self.doors, True, False)                              #BULLETS-DOORS
-        avatBaddieHits = pg.sprite.spritecollide(self.avatar, self.baddies, False)                     #AVATAR-BADDIES
+        pg.sprite.groupcollide(self.bullets, self.obstacles, True, False)                           #BULLETS-OBSTACLES
+        pg.sprite.groupcollide(self.bullets, self.doors, True, False)                               #BULLETS-DOORS
+        avatBaddieHits = pg.sprite.spritecollide(self.avatar, self.baddies, False)                  #AVATAR-BADDIES
         if avatBaddieHits:
+            if avatBaddieHits[0] in self.groundBadds: return
             self.avatar.injury(1)
             self.avatar.pos.x -= 5 * avatBaddieHits[0].orientation
             #if avatBaddieHits[0] in self.bigBadds: self.avatar.injury(2)
@@ -344,7 +395,7 @@ class Game:
         for baddie in self.baddies:                                                                 #BADDIES-BULLETS
             for bullet in self.bullets:
                 if pg.sprite.collide_rect(bullet, baddie):
-                    if bullet.source == "avatar" and self.freezeUpdate != "bigBadd" and self.freezeUpdate != "sniperBadd":
+                    if bullet.source == "avatar" and self.freezeUpdate != baddie.source:
                         baddie.lives -= 1
                         baddie.damageEffects()
                         bullet.kill()
@@ -355,19 +406,17 @@ class Game:
                 self.avatar.para = False
             elif avatBulletHits[0].source != "avatar":
                 self.avatar.injury(1)
-
         for bullet in self.bullets:                                                                 #BULLETS-WINDOWS
             for window in self.windows:
                 if pg.sprite.collide_rect(bullet, window) and not window.broken:
                     window.broken = True
-                    #window.image.fill(WHITE)
                     window.breaking = True
-     #   for baddie1 in self.baddies:                                                                #BIGBADD-BIGBADD
-    #        for baddie2 in self.baddies:
-   #             if id(baddie1) != id(baddie2) and pg.sprite.collide_rect(baddie1, baddie2):
-  #                  if baddie1.vel.x == baddie2.vel.x:
- #                       if baddie1.rect.x == baddie2.rect.x:
-#                            baddie2.kill()
+        """for baddie1 in self.baddies:                                                             #BADDIE-BADDIE
+            for baddie2 in self.baddies:
+                if id(baddie1) != id(baddie2) and pg.sprite.collide_rect(baddie1, baddie2):
+                    if baddie1.vel.x == baddie2.vel.x:
+                         if baddie1.rect.x == baddie2.rect.x:
+                              baddie2.kill()"""
         avatElevatorHits = pg.sprite.spritecollide(self.avatar, self.elevators, False)              #AVATAR-ELEVATORS
         if avatElevatorHits:
             elevator = avatElevatorHits[0].rect.centerx
@@ -402,7 +451,6 @@ class Game:
                     self.draw()
                 self.freezeUpdate = None
                 self.avatar.pos.y = self.avatar.rect.y
-
         avatPowerUpHits = pg.sprite.spritecollide(self.avatar, self.powerUps, True)                 #AVATAR-POWERUPS
         if avatPowerUpHits:
             if avatPowerUpHits[0].type == "life": self.avatar.lives += 1
@@ -410,7 +458,6 @@ class Game:
                 self.avatar.inventory.append(avatPowerUpHits[0].type)
                 if avatPowerUpHits[0].type == "minigun":
                     self.avatar.lastMinigunInit = pg.time.get_ticks()                    
-
         if "grapple" in self.avatar.inventory:                                                      #GRAPPLEHOOK-FLOORS
             for grapplehook in self.grapplehook: 
                     grapplehookFloorHits = pg.sprite.spritecollide(grapplehook, self.floors, False)
@@ -419,6 +466,9 @@ class Game:
                         self.freezeUpdate = "avatar"
                         initAvatPos = vec(self.avatar.rect.x,self.avatar.rect.y)
                         grapplehook.pos.y = grapplehookFloorHits[0].rect.bottom
+                        if self.avatar.orientation == 1: self.avatar.image = self.avatarRightGrappleImg
+                        else: self.avatar.image = self.avatarLeftGrappleImg
+                        self.avatar.image.set_colorkey(YELLOW)
                         while self.avatar.rect.top > grapplehook.rect.bottom:
                             if pg.sprite.spritecollide(self.avatar, self.obstacles, False): break
                             self.avatar.rect.y -= GRAPPLEHOOK_SPEED / 5
@@ -437,11 +487,16 @@ class Game:
         self.new()
         self.run()
 
-    def reset(self):
+    def resetLevel(self):
+        self.levelNum = 1
+        self.map = Map(self, self.mapList[self.levelNum - 1])
+
+    def resetLoops(self):
         self.playing = False
         self.paused = False
         self.moribund = False
-        fadeOut(self, WIDTH, HEIGHT, BLACK)
+        self.options = False
+        self.credits = False
         self.transitioning = True
 
     def hud(self):
@@ -456,15 +511,12 @@ class Game:
 
     def levelUp(self):
         self.levelNum += 1
-        if self.avatar.lives < 3: self.avatar.lives = 3
         self.map = Map(self, self.mapList[self.levelNum - 1])
-        currentInventory = self.avatar.inventory
-        fadeOut(self, WIDTH, HEIGHT, BLACK)
+        #fadeOut(self, WIDTH, HEIGHT, BLACK)
         self.restart()
         self.draw(noUpdate=True)
-        fadeIn(self, WIDTH, HEIGHT, BLACK)
+        #fadeIn(self, WIDTH, HEIGHT, BLACK)
         self.transitioning = True
-        self.avatar.inventory = currentInventory
 
     def changeStageType(self, glass):
         self.currentStageType = 1
@@ -475,9 +527,11 @@ class Game:
         def drawTitles():
             drawText(self, "NEW GAME", 72, GREY, WIDTH / 2, HEIGHT / 3, self.font1)
             drawText(self, "PRESS SPACE TO START", 52, GREY, WIDTH / 2, HEIGHT / 3 * 2, self.font1)
+        self.screen.fill(BLACK)
+        self.gmovr = False
         self.new()
-        self.camera.update(self.avatar)
-        fadeIn(self, WIDTH, HEIGHT, BLACK)
+        pg.mixer.music.load(path.join(self.audio_folder, "menu.wav"))
+        pg.mixer.music.play(loops=-1)
         drawMenuBox(self, WIDTH / 6, HEIGHT / 6, WIDTH / 1.5, HEIGHT / 1.5, NAVY, GREY)
         drawTitles()
         pg.display.flip()
@@ -500,9 +554,13 @@ class Game:
                         self.intro = False
 
     def game_over(self):
+        self.resetLevel()
+        self.draw()
+        #animateSprite()             #DEATH ANIMATION
         time.sleep(1)
         self.moribund = True
         pressed = False
+        self.gmovr = True
         while self.moribund:
             drawMenuBox(self, WIDTH / 3.25, HEIGHT / 3, WIDTH / 2.5, HEIGHT / 4, NAVY, GREY)
             drawText(self, "GAME OVER", 72, WHITE, WIDTH / 2, HEIGHT / 2.5, self.font1)
@@ -510,28 +568,32 @@ class Game:
             for event in pg.event.get():
                 if event.type == pg.QUIT: 
                     self.wantToQuit = True
-                    self.reset()
-                if event.type == pg.KEYDOWN: pressed = True
-                if event.type == pg.KEYUP and pressed:
-                    self.reset()
+                    self.resetLoops()
+                if event.type == pg.KEYDOWN: 
+                    self.resetLoops()
+    #def game_over(self):
+     #   self.resetLevel()
+      #  self.resetLoops()
 
     def pause(self):
         self.paused = True
-        spots = ["RESUME","OPTIONS","MAIN MENU"]
+        spots = ["RESUME","OPTIONS","EXIT"]
         spot = "RESUME"
         i = 0
+        pg.mixer.music.load(path.join(self.audio_folder, "menu.wav"))
+        pg.mixer.music.play(loops=-1)
         while self.paused:
             drawMenuBox(self, WIDTH / 3, HEIGHT / 6, WIDTH / 3, HEIGHT / 1.5, NAVY, GREY, 10)
             drawText(self, "RESUME", 64, GREY, WIDTH / 2, HEIGHT / 9 * 2, self.font1)
             drawText(self, "OPTIONS", 64, GREY, WIDTH / 2, HEIGHT / 9 * 4, self.font1)
-            drawText(self, "MAIN MENU", 64, GREY, WIDTH / 2, HEIGHT / 3 * 2, self.font1)
+            drawText(self, "EXIT", 64, GREY, WIDTH / 2, HEIGHT / 3 * 2, self.font1)
             spot, i = scrollMenu(spots, i)
             if spot == "RESUME":
                 drawText(self, "RESUME", 64, WHITE, WIDTH / 2, HEIGHT / 9 * 2, self.font1)
             if spot == "OPTIONS":
                 drawText(self, "OPTIONS", 64, WHITE, WIDTH / 2, HEIGHT / 9 * 4, self.font1)
-            if spot == "MAIN MENU":
-                drawText(self, "MAIN MENU", 64, WHITE, WIDTH / 2, HEIGHT / 3 * 2, self.font1)
+            if spot == "EXIT":
+                drawText(self, "EXIT", 64, WHITE, WIDTH / 2, HEIGHT / 3 * 2, self.font1)
             pg.display.update()
             for event in pg.event.get():
                 if event.type == pg.QUIT:
@@ -545,8 +607,11 @@ class Game:
                             self.paused = False
                         if spot == "OPTIONS":
                             self.optionsMenu()
-                        if spot == "MAIN MENU":
-                            self.reset()
+                        if spot == "EXIT":
+                            self.resetLevel()
+                            self.resetLoops()
+        pg.mixer.music.load(path.join(self.audio_folder, "levels.wav"))
+        pg.mixer.music.play()
     
     def optionsMenu(self):
         self.options = True
@@ -554,18 +619,6 @@ class Game:
         spot = "MUSIC"
         i = 0
         while self.options:
-            drawMenuBox(self, WIDTH / 3, HEIGHT / 6, WIDTH / 3, HEIGHT / 1.5, NAVY, GREY, 10)
-            drawText(self, "MUSIC", 64, GREY, WIDTH / 2, HEIGHT / 9 * 2, self.font1)
-            drawText(self, "ENTER CODE", 64, GREY, WIDTH / 2, HEIGHT / 9 * 4, self.font1)
-            drawText(self, "CREDITS", 64, GREY, WIDTH / 2, HEIGHT / 3 * 2, self.font1)
-            spot, i = scrollMenu(spots, i)
-            if spot == "MUSIC":
-                drawText(self, "MUSIC", 64, WHITE, WIDTH / 2, HEIGHT / 9 * 2, self.font1)
-            if spot == "ENTER CODE":
-                drawText(self, "ENTER CODE", 64, WHITE, WIDTH / 2, HEIGHT / 9 * 4, self.font1)
-            if spot == "CREDITS":
-                drawText(self, "CREDITS", 64, WHITE, WIDTH / 2, HEIGHT / 3 * 2, self.font1)
-            pg.display.update()
             for event in pg.event.get():
                 if event.type == pg.QUIT:
                     self.options = False
@@ -578,29 +631,45 @@ class Game:
                         self.options = False
                         self.paused = False
                     if event.key == pg.K_RETURN or event.key == pg.K_SPACE:
-                        if spot == "MUSIC": pass
-                            #pg.mixer.music.set_volume(0)
+                        if spot == "MUSIC": 
+                            if pg.mixer.music.get_volume() == 0:
+                                pg.mixer.music.set_volume(0.25)
+                            else: 
+                                pg.mixer.music.set_volume(0)
                         if spot == "ENTER CODE": pass
                         if spot == "CREDITS": self.creditsMenu()
+
+            drawMenuBox(self, WIDTH / 3, HEIGHT / 6, WIDTH / 3, HEIGHT / 1.5, NAVY, GREY, 10)
+            drawText(self, "MUSIC", 64, GREY, WIDTH / 2, HEIGHT / 9 * 2, self.font1)
+            drawText(self, "ENTER CODE", 64, GREY, WIDTH / 2, HEIGHT / 9 * 4, self.font1)
+            drawText(self, "CREDITS", 64, GREY, WIDTH / 2, HEIGHT / 3 * 2, self.font1)
+            spot, i = scrollMenu(spots, i)
+            if spot == "MUSIC":
+                drawText(self, "MUSIC", 64, WHITE, WIDTH / 2, HEIGHT / 9 * 2, self.font1)
+            if spot == "ENTER CODE":
+                drawText(self, "ENTER CODE", 64, WHITE, WIDTH / 2, HEIGHT / 9 * 4, self.font1)
+            if spot == "CREDITS":
+                drawText(self, "CREDITS", 64, WHITE, WIDTH / 2, HEIGHT / 3 * 2, self.font1)
+            pg.display.update()
     
     def creditsMenu(self):
         self.credits = True
         pressed = False
         while self.credits:
-            drawMenuBox(self, WIDTH / 4, HEIGHT / 6, WIDTH / 2, HEIGHT / 1.5, ORANGE, VIOLET, 10)
+            drawMenuBox(self, WIDTH / 4, HEIGHT / 6, WIDTH / 2, HEIGHT / 1.5, NAVY, GREY, 10)
             drawText(self, "PROGRAMMER: ", 28, WHITE, WIDTH / 8 * 3, HEIGHT / 11 * 3, self.font1)
             drawText(self, "ARTISTS:", 28, WHITE, WIDTH / 8 * 3, HEIGHT / 11 * 4, self.font1)
-            drawText(self, "LEVEL DESIGNER: ", 28, WHITE, WIDTH / 8 * 3, HEIGHT / 11 * 6, self.font1)
-            drawText(self, "COMPOSER: ", 28, WHITE, WIDTH / 8 * 3, HEIGHT / 11 * 7, self.font1)
-            drawText(self, "SOUND DESIGNER: ", 28, WHITE, WIDTH / 8 * 3, HEIGHT / 11 * 8, self.font1)
+            drawText(self, "LEVEL DESIGNER: ", 28, WHITE, WIDTH / 8 * 3, HEIGHT / 11 * 7, self.font1)
+            drawText(self, "COMPOSER: ", 28, WHITE, WIDTH / 8 * 3, HEIGHT / 11 * 8, self.font1)
+         #   drawText(self, "SOUND DESIGNER: ", 28, WHITE, WIDTH / 8 * 3, HEIGHT / 11 * 8, self.font1)
             drawText(self, "CALEB BAYLES", 24, WHITE, WIDTH / 8 * 5, HEIGHT / 11 * 3, self.font1)
             drawText(self, "SAM WITT", 24, WHITE, WIDTH / 8 * 5, HEIGHT / 11 * 4, self.font1)
-            drawText(self, "JOEY JONES", 24, WHITE, WIDTH / 8 * 5, HEIGHT / 11 * 4, self.font1)
-            drawText(self, "ZACH BALVANZ", 24, WHITE, WIDTH / 8 * 5, HEIGHT / 11 * 4, self.font1)
-            drawText(self, "JORDAN MIZE", 24, WHITE, WIDTH / 8 * 5, HEIGHT / 11 * 5, self.font1)
-            drawText(self, "ERIC TRICKEY", 24, WHITE, WIDTH / 8 * 5, HEIGHT / 11 * 6, self.font1)
-            drawText(self, "EVAN BOSAW", 24, WHITE, WIDTH / 8 * 5, HEIGHT / 11 * 7, self.font1)
-            drawText(self, "RYAN CHANCE", 24, WHITE, WIDTH / 8 * 5, HEIGHT / 11 * 8, self.font1)
+            drawText(self, "JOEY JONES", 24, WHITE, WIDTH / 8 * 5, HEIGHT / 11 * 5, self.font1)
+           # drawText(self, "ZACH BALVANZ", 24, WHITE, WIDTH / 8 * 3, HEIGHT / 11 * 5, self.font1)
+            drawText(self, "JORDAN MIZE", 24, WHITE, WIDTH / 8 * 5, HEIGHT / 11 * 6, self.font1)
+            drawText(self, "ERIC TRICKEY", 24, WHITE, WIDTH / 8 * 5, HEIGHT / 11 * 7, self.font1)
+            drawText(self, "EVAN BOSAW", 24, WHITE, WIDTH / 8 * 5, HEIGHT / 11 * 8, self.font1)
+        #    drawText(self, "RYAN CHANCE", 24, WHITE, WIDTH / 8 * 5, HEIGHT / 11 * 8, self.font1)
             pg.display.flip()
             for event in pg.event.get():
                 if event.type == pg.QUIT:
@@ -617,10 +686,12 @@ class Game:
     def drawTempLines(self):
         if self.grappleLine:
             for grapplehook in self.grapplehook:
-                pg.draw.line(self.screen, BLACK, self.camera.apply(self.avatar).center, self.camera.apply(grapplehook).center, 4)
+                pg.draw.line(self.screen, BLACK, self.camera.apply(self.avatar).midtop, self.camera.apply(grapplehook).center, 4)
 
 g = Game()
 while g.running:
     g.start_screen()
     g.new()
+    pg.mixer.music.load(path.join(g.audio_folder, "levels.wav"))
+    pg.mixer.music.play(loops=-1)
     g.run()
