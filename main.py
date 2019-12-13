@@ -190,8 +190,8 @@ class Game:
         self.screen.blit(tempSurf, (0,0))
 
     def connectBgSlices(self):
-        #bgSlice = pg.image.load(path.join(self.img_folder, 'backgroundSlice.png'))
-        bgSlice = pg.image.load('backgroundSlice.png')
+        bgSlice = pg.image.load(path.join(self.img_folder, 'backgroundSlice.png'))
+        #bgSlice = pg.image.load('backgroundSlice.png')
         sliceNum = self.map.tileHeight / 6
         self.background = pg.Surface((bgSlice.get_width(), bgSlice.get_height() * sliceNum))
         i = 0
