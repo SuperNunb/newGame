@@ -5,7 +5,7 @@ import levels
 from settings import *
 from sprites import *
 from other import *
-from os import path
+from os import path, getcwd
 
 class Game:
     def __init__(self):
@@ -31,10 +31,13 @@ class Game:
         self.gmovr = False
 
     def load_data(self):
-        self.main_folder = path.dirname(__file__)
-        self.img_folder = path.join(self.main_folder, 'img')
-        self.level_folder = path.join(self.main_folder, 'levels')
-        self.audio_folder = path.join(self.main_folder, 'audio')
+        #self.main_folder = getcwd()
+        #if getattr(sys, 'frozen', False):
+        #    self.main_folder = path.dirname(sys.executable)   # frozen
+        #else:
+        #    self.main_folder = path.dirname(__file__)  # unfrozen
+        #self.img_folder = path.join(self.main_folder, 'img')
+        #self.audio_folder = path.join(self.main_folder, 'audio')
         self.mapList = [levels.level1, levels.level2, levels.level3, levels.level4, levels.level5, 
                         levels.level6, levels.level7, levels.level8, levels.level9, levels.level10]
         self.map = Map(self, self.mapList[self.levelNum - 1])
@@ -73,11 +76,14 @@ class Game:
 
     def events(self):
         def powerUpEvents():
-            if "grapple" in self.avatar.inventory and len(self.grapplehook) == 0 and self.avatar.grappleCollCheck(): 
+            if "grapple" in self.avatar.inventory and len(self.grapplehook) == 0 and self.avatar.grappleCollCheck() and not self.avatar.stealth and self.avatar.grapplehookCount > 0: 
                 Grapplehook(self, vec(self.avatar.pos.x + 10, self.avatar.pos.y))
+                self.avatar.grapplehookCount -= 1
             elif "stealth" in self.avatar.inventory:
-                self.avatar.stealth = True
-                self.avatar.last_stealth = pg.time.get_ticks() + POWERUP_TIMEOUT
+                if self.avatar.stealth: self.avatar.stealth = False
+                elif len(self.grapplehook) == 0:
+                    self.avatar.stealth = True
+                    self.avatar.last_stealth = pg.time.get_ticks() + POWERUP_TIMEOUT
         #UNHOLDABLE EVENTS
         for event in pg.event.get():
             if event.type == pg.QUIT:
@@ -119,7 +125,7 @@ class Game:
                 if event.button == 3:
                     if self.avatar.nearElevator: self.avatar.tryElevator = True
                     else: powerUpEvents()
- 
+
         #HOLDABLE EVENTS
         self.avatar.acc.x = 0
         keys = pg.key.get_pressed()
@@ -188,7 +194,8 @@ class Game:
         self.screen.blit(tempSurf, (0,0))
 
     def connectBgSlices(self):
-        bgSlice = pg.image.load(path.join(self.img_folder, 'backgroundSlice.png'))
+        #bgSlice = pg.image.load(path.join(self.img_folder, 'backgroundSlice.png'))
+        bgSlice = pg.image.load('backgroundSlice.png')
         sliceNum = self.map.tileHeight / 6
         self.background = pg.Surface((bgSlice.get_width(), bgSlice.get_height() * sliceNum))
         i = 0
@@ -261,7 +268,7 @@ class Game:
         self.stealthImg = self.other_sheet.getImage(46,0,9,10,36,40)
         
         self.tableImg = self.statics_sheet.getImage(0,60,22,12,88,48)
-        self.desktopImg = self.statics_sheet.getImage(22,60,22,19,88,76)
+        self.desktopImg = self.statics_sheet.getImage(22,60,22,18,88,72)
         self.stoolUpImg = self.statics_sheet.getImage(44,60,8,10,32,40)
         self.stoolDownImg = self.statics_sheet.getImage(52,60,8,10,40,32)
         self.fireExtinguisherImg = self.statics_sheet.getImage(44,70,9,17,28,68)
@@ -457,7 +464,9 @@ class Game:
             elif not avatPowerUpHits[0].type in self.avatar.inventory:
                 self.avatar.inventory.append(avatPowerUpHits[0].type)
                 if avatPowerUpHits[0].type == "minigun":
-                    self.avatar.lastMinigunInit = pg.time.get_ticks()                    
+                    self.avatar.lastMinigunInit = pg.time.get_ticks()
+                if avatPowerUpHits[0].type == "grapple": 
+                    self.avatar.grapplehookCount = 3
         if "grapple" in self.avatar.inventory:                                                      #GRAPPLEHOOK-FLOORS
             for grapplehook in self.grapplehook: 
                     grapplehookFloorHits = pg.sprite.spritecollide(grapplehook, self.floors, False)
@@ -470,11 +479,14 @@ class Game:
                         else: self.avatar.image = self.avatarLeftGrappleImg
                         self.avatar.image.set_colorkey(YELLOW)
                         while self.avatar.rect.top > grapplehook.rect.bottom:
+                            if self.avatar.lives <= 0: 
+                                break
+                                return
                             if pg.sprite.spritecollide(self.avatar, self.obstacles, False): break
                             self.avatar.rect.y -= GRAPPLEHOOK_SPEED / 5
                             self.camera.update(self.avatar)
                             self.events()
-                            self.update()
+                            if self.avatar.lives > 0: self.update()
                             self.draw()
                         self.freezeUpdate = None
                         self.avatar.pos.y = self.avatar.rect.y
@@ -502,11 +514,15 @@ class Game:
     def hud(self):
         if self.hudVisible:
             i = 1
+            j = 1
             while i <= self.avatar.lives:
                 self.lifeImg.set_colorkey(YELLOW)
                 self.screen.blit(self.lifeImg, pg.Rect(WIDTH / 16 + i * TILESIZE * 1.125, TILESIZE / 3, TILESIZE, TILESIZE))
                 i += 1
-            #drawText(self, "SCORE: " + str(), 42, WHITE, WIDTH / 4 * 3, TILESIZE / 2, self.font1)
+            while j <= self.avatar.grapplehookCount:
+                self.grapplehookImg.set_colorkey(YELLOW)
+                self.screen.blit(self.grapplehookImg, pg.Rect(WIDTH - WIDTH / 16 - j * TILESIZE * 1.125, TILESIZE / 3, TILESIZE, TILESIZE))
+                j += 1
             drawText(self, "LEVEL " + str(self.levelNum), 42, WHITE, WIDTH / 2, TILESIZE / 2, self.font1)
 
     def levelUp(self):
@@ -530,7 +546,8 @@ class Game:
         self.screen.fill(BLACK)
         self.gmovr = False
         self.new()
-        pg.mixer.music.load(path.join(self.audio_folder, "menu.wav"))
+        pg.mixer.music.load("menu.wav")
+        #pg.mixer.music.load(path.join(self.audio_folder, "menu.wav"))
         pg.mixer.music.play(loops=-1)
         drawMenuBox(self, WIDTH / 6, HEIGHT / 6, WIDTH / 1.5, HEIGHT / 1.5, NAVY, GREY)
         drawTitles()
@@ -580,7 +597,8 @@ class Game:
         spots = ["RESUME","OPTIONS","EXIT"]
         spot = "RESUME"
         i = 0
-        pg.mixer.music.load(path.join(self.audio_folder, "menu.wav"))
+        pg.mixer.music.load("menu.wav")
+#        pg.mixer.music.load(path.join(self.audio_folder, "menu.wav"))
         pg.mixer.music.play(loops=-1)
         while self.paused:
             drawMenuBox(self, WIDTH / 3, HEIGHT / 6, WIDTH / 3, HEIGHT / 1.5, NAVY, GREY, 10)
@@ -610,7 +628,8 @@ class Game:
                         if spot == "EXIT":
                             self.resetLevel()
                             self.resetLoops()
-        pg.mixer.music.load(path.join(self.audio_folder, "levels.wav"))
+#        pg.mixer.music.load(path.join(self.audio_folder, "levels.wav"))
+        pg.mixer.music.load("levels.wav")
         pg.mixer.music.play()
     
     def optionsMenu(self):
@@ -692,6 +711,8 @@ g = Game()
 while g.running:
     g.start_screen()
     g.new()
-    pg.mixer.music.load(path.join(g.audio_folder, "levels.wav"))
+    #pg.mixer.music.load(path.join(g.audio_folder, "levels.wav"))
+    pg.mixer.music.load("levels.wav")
     pg.mixer.music.play(loops=-1)
     g.run()
+pg.quit()

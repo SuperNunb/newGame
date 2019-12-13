@@ -84,28 +84,28 @@ class CollDecor(Obstacle):
         self.groups = game.all_sprites, game.statics, game.obstacles, game.decor
         xPixelDiff = 0
         yPixelDiff = 0
-        topGhost = 0
         if tile == 30: self.image = game.tableImg
         elif tile == 31: self.image = game.stoolUpImg
         elif tile == 32: 
             self.image = game.stoolDownImg
             yPixelDiff = 4
-        elif tile == 33: 
-            self.image = game.desktopImg
-            yPixelDiff = 5
-            topGhost = 24
         super().__init__(game, x,y, self.groups, self.image)
-#        self.rect = pg.Rect(x * TILESIZE, y * TILESIZE, self.rect.width, self.rect.height)
-#        self.rect.topleft = vec((x * TILESIZE + xPixelDiff * 4), (y * TILESIZE + yPixelDiff * 4 + topGhost))
- #       pg.draw.rect(self.game.background, YELLOW, self.rect)
+        self.rect = self.image.get_rect()
+        self.rect.topleft = vec(x * TILESIZE + xPixelDiff * 4, y * TILESIZE + yPixelDiff * 4)
 class GhostDecor(Static):
     def __init__(self, game, x,y, tile):
         self.groups = game.all_sprites, game.statics, game.decor
+        xPixelDiff = 0
+        yPixelDiff = 0
         if tile == 34: self.image = game.biohazardImg
         elif tile == 35: self.image = game.centrifugeImg
-        elif tile == 36: self.image = game.tellyImg
+        elif tile == 36: 
+            self.image = game.desktopImg
+            yPixelDiff = 4
         elif tile == 37: self.image = game.fireExtinguisherImg
         super().__init__(game, x,y, self.groups, self.image)
+        self.rect = self.image.get_rect()
+        self.rect.topleft = vec(x * TILESIZE + xPixelDiff * 4, y * TILESIZE + yPixelDiff * 4)
 class DepthStatic(Static):
     def __init__(self, game, x,y, image):
         self.groups = game.all_sprites, game.statics, game.depthStatics
@@ -130,6 +130,7 @@ class Avatar(pg.sprite.Sprite):
         self.para = False
         self.last_shot = 0
         self.last_stealth = 0
+        self.grapplehookCount = 0
         self.orientation = 1 
         self.paraTorn = False
         self.nearLadder = False
@@ -139,7 +140,6 @@ class Avatar(pg.sprite.Sprite):
         self.nearElevator = False
         self.inventory = []
         self.lastMinigunInit = 0
-        self.grapplehook = None
         self.stealth = False
         self.crouching = False
         self.shootingForAnimation = False
@@ -173,8 +173,10 @@ class Avatar(pg.sprite.Sprite):
         self.rect = pg.Rect((self.pos.x, self.pos.y, TILESIZE, self.height))
         self.acc.x += self.vel.x * -FRICTION
         self.vel += self.acc
-        if self.crouching: self.pos.x += (self.vel.x + 0.5 * self.acc.x * self.game.dt) / 2
-        else: self.pos.x += self.vel.x + 0.5 * self.acc.x * self.game.dt
+        #if self.crouching: self.pos.x += (self.vel.x + 0.5 * self.acc.x * self.game.dt) / 2
+        #else: self.pos.x += self.vel.x + 0.5 * self.acc.x * self.game.dt
+        if self.crouching: self.pos.x += (self.vel.x + 0.5 * self.acc.x) / 2
+        else: self.pos.x += self.vel.x + 0.5 * self.acc.x
         self.pos.y += self.vel.y * self.game.dt
         self.rect.x = self.pos.x
         self.collide_with_obstacles('x')
@@ -225,28 +227,32 @@ class Avatar(pg.sprite.Sprite):
                 self.last_stealth = 0
             else:
                 self.image.set_alpha(122)
-        
         self.image.set_colorkey(YELLOW)
+        if self.grapplehookCount <= 0: 
+            self.grapplehookCount = 0
+            if "grapple" in self.inventory: self.inventory.remove("grapple")
+        if self.grapplehookCount > 3: self.grapplehookCount = 3
 
     def collide_with_obstacles(self, direction):
         obstacleHits = pg.sprite.spritecollide(self, self.game.obstacles, False)
         if obstacleHits:
+            rect = obstacleHits[0].rect
             if direction == 'x':
                 if self.vel.x > 0:
-                    self.pos.x = (obstacleHits[0].rect.left - self.rect.width)
+                    self.pos.x = (rect.left - self.rect.width)
                 if self.vel.x < 0:
-                    self.pos.x = (obstacleHits[0].rect.right)
+                    self.pos.x = rect.right
                 self.rect.x = self.pos.x
             elif direction == 'y':
                 if self.vel.y > 0:
-                    self.pos.y = (obstacleHits[0].rect.top - self.rect.height)
-                   # if self.vel.y > 895:
-                    #    self.lives -= 3
+                    self.pos.y = (rect.top - self.rect.height)
+                    if self.vel.y > GRAVITY * 45:
+                        self.lives -= 3
                     if self.para:
                         self.paraTorn = True
                         self.para = False
                 if self.vel.y < 0:
-                    self.pos.y = (obstacleHits[0].rect.bottom)
+                    self.pos.y = rect.bottom
                 self.vel.y = 0
                 self.rect.y = self.pos.y
                 self.jumping = False
@@ -273,6 +279,7 @@ class Avatar(pg.sprite.Sprite):
             self.last_shot = now
             Bullet(self.game, vec(spawn, self.rect.top + TILESIZE / 2), vec(self.orientation * BULLET_SPEED, 0), "avatar")
         elif now - self.last_shot > AVAT_BULLET_DELAY:
+            if "minigun" in self.inventory: self.inventory.remove("minigun")
             self.last_shot = now
             Bullet(self.game, vec(spawn, self.rect.top + TILESIZE / 11 * 5), vec(self.orientation * BULLET_SPEED, 0), "avatar")
         self.shootingForAnimation = True
