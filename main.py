@@ -31,13 +31,9 @@ class Game:
         self.gmovr = False
 
     def load_data(self):
-        #self.main_folder = getcwd()
-        #if getattr(sys, 'frozen', False):
-        #    self.main_folder = path.dirname(sys.executable)   # frozen
-        #else:
-        #    self.main_folder = path.dirname(__file__)  # unfrozen
-        #self.img_folder = path.join(self.main_folder, 'img')
-        #self.audio_folder = path.join(self.main_folder, 'audio')
+        self.main_folder = path.dirname(__file__)  # unfrozen
+        self.img_folder = path.join(self.main_folder, 'img')
+        self.audio_folder = path.join(self.main_folder, 'audio')
         self.mapList = [levels.level1, levels.level2, levels.level3, levels.level4, levels.level5, 
                         levels.level6, levels.level7, levels.level8, levels.level9, levels.level10]
         self.map = Map(self, self.mapList[self.levelNum - 1])
