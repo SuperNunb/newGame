@@ -10,7 +10,7 @@ from os import path, getcwd
 class Game:
     def __init__(self):
         pg.init()
-        pg.mixer.init()
+        #pg.mixer.init()
         self.screen = pg.display.set_mode((WIDTH, HEIGHT), depth=BIT_DEPTH)
         pg.display.set_caption(TITLE)
         #pg.display.set_icon()
@@ -42,7 +42,7 @@ class Game:
                         levels.level6, levels.level7, levels.level8, levels.level9, levels.level10]
         self.map = Map(self, self.mapList[self.levelNum - 1])
         self.defineImgs()
-        pg.mixer.music.set_volume(0.25)
+        #pg.mixer.music.set_volume(0.25)
 
     def new(self):
         if self.wantToQuit:
@@ -546,9 +546,9 @@ class Game:
         self.screen.fill(BLACK)
         self.gmovr = False
         self.new()
-        pg.mixer.music.load("menu.wav")
+        #pg.mixer.music.load("menu.wav")
         #pg.mixer.music.load(path.join(self.audio_folder, "menu.wav"))
-        pg.mixer.music.play(loops=-1)
+        #pg.mixer.music.play(loops=-1)
         drawMenuBox(self, WIDTH / 6, HEIGHT / 6, WIDTH / 1.5, HEIGHT / 1.5, NAVY, GREY)
         drawTitles()
         pg.display.flip()
@@ -597,9 +597,9 @@ class Game:
         spots = ["RESUME","OPTIONS","EXIT"]
         spot = "RESUME"
         i = 0
-        pg.mixer.music.load("menu.wav")
+       # pg.mixer.music.load("menu.wav")
 #        pg.mixer.music.load(path.join(self.audio_folder, "menu.wav"))
-        pg.mixer.music.play(loops=-1)
+        #pg.mixer.music.play(loops=-1)
         while self.paused:
             drawMenuBox(self, WIDTH / 3, HEIGHT / 6, WIDTH / 3, HEIGHT / 1.5, NAVY, GREY, 10)
             drawText(self, "RESUME", 64, GREY, WIDTH / 2, HEIGHT / 9 * 2, self.font1)
@@ -629,8 +629,8 @@ class Game:
                             self.resetLevel()
                             self.resetLoops()
 #        pg.mixer.music.load(path.join(self.audio_folder, "levels.wav"))
-        pg.mixer.music.load("levels.wav")
-        pg.mixer.music.play()
+      #  pg.mixer.music.load("levels.wav")
+     #   pg.mixer.music.play()
     
     def optionsMenu(self):
         self.options = True
@@ -650,11 +650,11 @@ class Game:
                         self.options = False
                         self.paused = False
                     if event.key == pg.K_RETURN or event.key == pg.K_SPACE:
-                        if spot == "MUSIC": 
-                            if pg.mixer.music.get_volume() == 0:
-                                pg.mixer.music.set_volume(0.25)
-                            else: 
-                                pg.mixer.music.set_volume(0)
+                   #     if spot == "MUSIC": 
+                         #   if pg.mixer.music.get_volume() == 0:
+                          #      pg.mixer.music.set_volume(0.25)
+                           # else: 
+                            #    pg.mixer.music.set_volume(0)
                         if spot == "ENTER CODE": pass
                         if spot == "CREDITS": self.creditsMenu()
 
@@ -712,7 +712,7 @@ while g.running:
     g.start_screen()
     g.new()
     #pg.mixer.music.load(path.join(g.audio_folder, "levels.wav"))
-    pg.mixer.music.load("levels.wav")
-    pg.mixer.music.play(loops=-1)
+    #pg.mixer.music.load("levels.wav")
+    #pg.mixer.music.play(loops=-1)
     g.run()
 pg.quit()
