@@ -15,8 +15,8 @@ class Map:
 class Spritesheet:
     def __init__(self, game, filename):
         self.game = game
-        #self.spritesheet = pg.image.load(path.join(self.game.img_folder, filename)).convert()
-        self.spritesheet = pg.image.load(filename).convert()
+        self.spritesheet = pg.image.load(path.join(self.game.img_folder, filename)).convert()
+        #self.spritesheet = pg.image.load(filename).convert()
     def getImage(self, x, y, w, h, diffWidth=TILESIZE, diffHeight=TILESIZE):
         prospectWidth = diffWidth
         prospectHeight = diffHeight
