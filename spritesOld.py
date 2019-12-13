@@ -80,7 +80,7 @@ class Avatar(pg.sprite.Sprite):
                 if self.vel.x < 0: self.image = pg.transform.flip(self.game.avatarRightCrouchImg, True, False)
                 else: self.image = self.game.avatarRightCrouchImg
                 self.rect = self.image.get_rect()
-                self.rect.y = self.pos.y + TILESIZE
+                self.rect.y = self.pos.y + 3 * 6 + 12
                 self.rect.x = self.pos.x
                 self.vel.x = 0
         if self.lives <= 0:
@@ -251,11 +251,11 @@ class Window(pg.sprite.Sprite):
         self.breaking = False
     
     def update(self):
-        if self.broken: self.image = self.game.windowGoneImg
         if self.breaking: 
-            animateSprite(self.breakAnimateIndex, [self.game.windowCrackedImg, self.game.windowGoneImg], 0.25)
+            self.image, self.breakAnimateIndex = animateSprite(self.breakAnimateIndex, [self.game.windowCrackedImg, self.game.windowGoneImg], 0.15)
             if self.breakAnimateIndex > 1:
                 self.breaking = False
+        self.image.set_colorkey(YELLOW)
 
 class BigBadd(pg.sprite.Sprite):
     def __init__(self, game, x,y, orientation):
