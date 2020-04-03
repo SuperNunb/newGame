@@ -9,7 +9,7 @@ from os import path
 class Game:
     def __init__(self):
         pg.init()
-        pg.mixer.init()
+        #pg.mixer.init()
         self.screen = pg.display.set_mode((WIDTH, HEIGHT), depth=BIT_DEPTH)
         pg.display.set_caption(TITLE)
         self.clock = pg.time.Clock()
@@ -53,7 +53,7 @@ class Game:
         self.map = Map(self, self.mapList[self.levelNum - 1])
         self.defineImgs()
 
-        self.effectsChannel = pg.mixer.Channel(0)
+        """self.effectsChannel = pg.mixer.Channel(0)
         self.windChannel = pg.mixer.Channel(1)
         self.effectsChannel.set_volume(0.5)
         self.windChannel.set_volume(0.75,1)
@@ -68,7 +68,7 @@ class Game:
         self.musicOn = self.readUserInfo(1)
         self.textOn = self.readUserInfo(2)
         if self.musicOn: pg.mixer.music.set_volume(0.15)
-        else: pg.mixer.music.set_volume(0)
+        else: pg.mixer.music.set_volume(0)"""
 
     def new(self):
         if self.wantToQuit:
@@ -89,8 +89,8 @@ class Game:
                 sprite.image = sprite.image.convert(BIT_DEPTH)
             self.drawBackgroundText()
             if self.levelNum > 10:
-                pg.mixer.music.load(path.join(self.audio_folder, "boss.wav"))
-                pg.mixer.music.play(loops=-1)
+                #pg.mixer.music.load(path.join(self.audio_folder, "boss.wav"))
+                #pg.mixer.music.play(loops=-1)
             self.camera.update(self.avatar)
 
     def run(self):
@@ -519,7 +519,7 @@ class Game:
         if avatWindowHits:
             if not avatWindowHits[0].broken:
                 self.avatar.injury(1)
-                self.effectsChannel.play(self.glassSound)
+                #self.effectsChannel.play(self.glassSound)
             if self.avatar.vel.x > 0:
                 self.changeStageType(avatWindowHits[0])
             avatWindowHits[0].broken = False
@@ -527,7 +527,7 @@ class Game:
         for decor in self.decor:                                                                    #DECOR-BULLETS
             decorBulletHits = pg.sprite.spritecollide(decor, self.bullets, False)
             if decorBulletHits and decor.destroy and decorBulletHits[0].source == "avatar": 
-                self.effectsChannel.play(self.damageSound)
+                #self.effectsChannel.play(self.damageSound)
                 damageEffects(decor, self, "decor", 0.25)
                 decor.dying = True
         pg.sprite.groupcollide(self.bullets, self.obstacles, True, False)                           #BULLETS-OBSTACLES
@@ -555,7 +555,7 @@ class Game:
                 if pg.sprite.collide_rect(bullet, window) and not window.broken:
                     window.broken = True
                     window.breaking = True
-                    self.effectsChannel.play(self.glassSound)
+                    #self.effectsChannel.play(self.glassSound)
         avatElevatorHits = pg.sprite.spritecollide(self.avatar, self.elevators, False)              #AVATAR-ELEVATORS
         if avatElevatorHits:
             for elevator in self.elevators:
@@ -581,7 +581,7 @@ class Game:
                     self.avatar.lastMinigunInit = pg.time.get_ticks()
                 if avatPowerUpHits[0].type == "grapple": 
                     self.avatar.grapplehookCount = 3
-            self.effectsChannel.play(self.powerupSound)
+            #self.effectsChannel.play(self.powerupSound)
         if "grapple" in self.avatar.inventory:                                                      #GRAPPLEHOOK-FLOORS
             for grapplehook in self.grapplehook: 
                 grapplehookFloorHits = pg.sprite.spritecollide(grapplehook, self.floors, False)
@@ -593,7 +593,7 @@ class Game:
                     if self.avatar.orientation == 1: self.avatar.image = self.avatarRightGrappleImg
                     else: self.avatar.image = self.avatarLeftGrappleImg
                     self.avatar.image.set_colorkey(YELLOW)
-                    self.effectsChannel.play(self.grappleSound)
+                    #self.effectsChannel.play(self.grappleSound)
                     while self.avatar.rect.top > grapplehook.rect.bottom:
                         if self.avatar.lives <= 0: 
                             break
@@ -667,7 +667,7 @@ class Game:
         mover.fill(random.choice([DOWNTONE_BLUE, RUSTED_BLUE, CHARCOAL_GREY]))
         drawText(self, "LEVEL " + str(self.levelNum), 72, WHITE, WIDTH / 2, HEIGHT / 2 - 36, screen=mover)
         self.map = Map(self, self.mapList[self.levelNum - 1])
-        self.windChannel.stop()
+        #self.windChannel.stop()
 
         while x <= 0:
             self.draw(noUpdate=True)
@@ -691,8 +691,8 @@ class Game:
             self.avatar.para = True
             self.avatar.pos.x = glass.rect.right
             self.avatar.pos.y = glass.rect.top
-            self.effectsChannel.play(self.parachuteSound)
-            self.windChannel.play(self.windSound, loops=3)
+            #self.effectsChannel.play(self.parachuteSound)
+            3self.windChannel.play(self.windSound, loops=3)
 
     def start_screen(self):
         def drawTitles():
@@ -700,8 +700,8 @@ class Game:
             drawText(self, "PRESS SPACE TO START", 52, WHITE, WIDTH / 2, HEIGHT / 3 * 2)
         self.screen.fill(BLACK)
         self.new()
-        pg.mixer.music.load(path.join(self.audio_folder, "menu.wav"))
-        pg.mixer.music.play(loops=-1)
+        #pg.mixer.music.load(path.join(self.audio_folder, "menu.wav"))
+        #pg.mixer.music.play(loops=-1)
         drawMenuBox(self, WIDTH / 6, HEIGHT / 6, WIDTH / 1.5, HEIGHT / 1.5, NAVY, GREY)
         drawTitles()
         pg.display.flip()
@@ -793,8 +793,8 @@ class Game:
         spots = ["RESUME","OPTIONS","EXIT"]
         i = 0
         yPos = 0
-        pg.mixer.music.load(path.join(self.audio_folder, "menu.wav"))
-        pg.mixer.music.play(loops=-1)
+        #pg.mixer.music.load(path.join(self.audio_folder, "menu.wav"))
+        #pg.mixer.music.play(loops=-1)
         drawMenuBox(self, WIDTH / 3, HEIGHT / 6, WIDTH / 3, HEIGHT / 1.5, NAVY, GREY, 10)
         for index in range(len(spots)):
             drawText(self, spots[index], 64, GREY, WIDTH / 2, HEIGHT / 9 * (2 + yPos))
@@ -824,8 +824,8 @@ class Game:
                             self.resetLevel()
                             self.resetLoops()
             pg.display.flip()
-        pg.mixer.music.load(path.join(self.audio_folder, "levels.wav"))
-        pg.mixer.music.play()
+        #pg.mixer.music.load(path.join(self.audio_folder, "levels.wav"))
+        #pg.mixer.music.play()
 
     def optionsMenu(self):
         self.options = True
@@ -858,14 +858,14 @@ class Game:
                         self.options = False
                         self.paused = False
                     elif event.key == pg.K_RETURN or event.key == pg.K_SPACE:
-                        if int(i) == 0: 
+                        """if int(i) == 0: 
                             if pg.mixer.music.get_volume() == 0:
                                 pg.mixer.music.set_volume(0.15)
                                 self.musicOn = 1
                             else: 
                                 pg.mixer.music.set_volume(0)
                                 self.musicOn = 0
-                            self.writeUserInfo()                            
+                            self.writeUserInfo()"""
                         if int(i) == 1: self.codeScreen()
                         if int(i) == 2: self.creditsMenu()
             pg.display.update()
@@ -1109,8 +1109,8 @@ while g.running:
     g.haste = False
     g.start_screen()
     g.new()
-    pg.mixer.music.load(path.join(g.audio_folder, "levels.wav"))
-    pg.mixer.music.play(loops=-1)
+    #pg.mixer.music.load(path.join(g.audio_folder, "levels.wav"))
+    #pg.mixer.music.play(loops=-1)
     g.run()
 pg.quit()
 quit()
