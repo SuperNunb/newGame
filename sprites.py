@@ -377,7 +377,7 @@ class Avatar(pg.sprite.Sprite):
         if hits and not self.jumping and not self.para:
             self.jumping = True
             self.acc.y = -AVATAR_JUMP
-            self.game.effectsChannel.play(self.game.jumpSound)
+            #self.game.effectsChannel.play(self.game.jumpSound)
 
     def jumpCut(self):
         if self.jumping and self.vel.y < -2 * AVATAR_JUMP:
@@ -405,7 +405,7 @@ class Avatar(pg.sprite.Sprite):
             self.invulnerable = False
         if not self.invulnerable:
             self.lives -= damage
-            self.game.effectsChannel.play(self.game.damageSound)
+            #self.game.effectsChannel.play(self.game.damageSound)
             damageEffects(self, self.game, "avatar")
 
     def grappleCollCheck(self):
@@ -588,7 +588,7 @@ class Bullet(pg.sprite.Sprite):
         self.vel = direction * self.game.bulletSpeed
         if direction.x < 0: self.image = pg.transform.flip(self.image, True, False)
         self.source = source
-        if game.camera.apply(self).x < WIDTH and game.camera.apply(self).x > 0 and game.camera.apply(self).y > 0 and game.camera.apply(self).y < HEIGHT: game.effectsChannel.play(self.game.gunSound)
+        #if game.camera.apply(self).x < WIDTH and game.camera.apply(self).x > 0 and game.camera.apply(self).y > 0 and game.camera.apply(self).y < HEIGHT: game.effectsChannel.play(self.game.gunSound)
 
     def update(self):
         self.rect.topleft += self.vel * self.game.dt
@@ -605,7 +605,7 @@ class Grapplehook(pg.sprite.Sprite):
         self.pos = vec(pos.x, pos.y)
         self.rect.topleft = self.pos
         self.vel = vec(0, GRAPPLEHOOK_SPEED)
-        self.game.effectsChannel.play(self.game.grappleSound)
+        #self.game.effectsChannel.play(self.game.grappleSound)
 
     def update(self):
         self.rect.topleft -= self.vel
