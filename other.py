@@ -16,7 +16,6 @@ class Spritesheet:
     def __init__(self, game, filename):
         self.game = game
         self.spritesheet = pg.image.load(path.join(self.game.img_folder, filename)).convert()
-        #self.spritesheet = pg.image.load(filename).convert()
     def getImage(self, x, y, w, h, diffWidth=TILESIZE, diffHeight=TILESIZE):
         prospectWidth = diffWidth
         prospectHeight = diffHeight
@@ -36,22 +35,25 @@ class Camera:
         if not isRect: return entity.rect.move(self.camera.topleft)
         if isRect: return entity.move(self.camera.topleft)
 
-    def update(self, target):       #MOVES CAMERA TO TARGET SPRITE
-        x = -target.rect.x + int(WIDTH / 2)
-        y = -target.rect.y + int(WIDTH / 3)
-        x = min(0, x)
-        y = min(0, y)
-        x = max(-(self.width - WIDTH), x)
-        y = max(-(self.height - HEIGHT), y)
+    def update(self, target, updateX=True, updateY=True):       #MOVES CAMERA TO TARGET SPRITE
+        if updateX:
+            x = -target.rect.x + int(WIDTH / 2)
+            x = min(0, x)
+            x = max(-(self.width - WIDTH), x)
+            self.camera.x = x
+        if updateY:
+            y = -target.rect.y + int(WIDTH / 3)
+            y = min(0, y)
+            y = max(-(self.height - HEIGHT), y)
+            self.camera.y = y        
 
-        self.camera = pg.Rect(x,y, self.width, self.height)
-
-def drawText(self, msg, size, color, x, y, foonti):
+def drawText(self, msg, size, color, x, y, foonti=FONT_1, screen=None):
     font = pg.font.Font(foonti, size)
     text_surface = font.render(msg, False, color)
     text_rect = text_surface.get_rect()
     text_rect.midtop = (x,y)
-    self.screen.blit(text_surface, text_rect)
+    if screen == None: screen = self.screen
+    screen.blit(text_surface, text_rect)
     return text_surface
 
 def fadeIn(self, width, height, color):
@@ -81,21 +83,18 @@ def fadeFull(self, width, height, color, sleepTime):
     time.sleep(1)
     fadeIn(self, width, height, color)
 
-def scrollMenu(spots, index):
-    spot = spots[index]
-    for event in pg.event.get():
-        if event.type == pg.KEYDOWN:
-            if event.key == pg.K_DOWN:
-                index += 1
-                if index >= len(spots):
-                    index = 0
-                spot = spots[index]
-            elif event.key == pg.K_UP:
-                index -= 1
-                if index < 0:
-                    index = len(spots) - 1
-                spot = spots[index]
-    return spot, index
+def scrollMenu(spots, index, speed=0.1):
+    spot = spots[int(index)]
+    keys = pg.key.get_pressed()
+    if keys[pg.K_DOWN] or keys[pg.K_s]:
+        index += speed
+        if index >= len(spots): index = 0
+        spot = spots[int(index)]
+    elif keys[pg.K_UP] or keys[pg.K_w]:
+        index -= speed
+        if index < 0: index = len(spots) - 1
+        spot = spots[int(index)]
+    return index
 
 def setupControllers(self):
     self.joysticks = []
@@ -108,8 +107,45 @@ def drawMenuBox(self, x, y, width, height, boxColor, borderColor, borderSize=10)
     pg.draw.rect(self.screen, borderColor, (x - borderSize, y - borderSize, width + borderSize * 2, height + borderSize * 2))
     pg.draw.rect(self.screen, boxColor, (x, y, width, height))
 
-def animateSprite(index, imageArray, delayTime):
+def animateSprite(index, imageArray, delayTime=DEFAULT_ANIMATION_DELAY, suspend=False, joe=False):
     arrLen = len(imageArray)
     index += delayTime
-    if index >= arrLen: index = 0
+    if joe: print(index)
+    if index >= arrLen: 
+        if suspend: index = arrLen - 1
+        else: index = 0
     return imageArray[int(index)], index
+
+def damageEffects(target, game, freezeUpdate, speed=0.5):
+    tempImg1 = target.image.copy()
+    tempImg2 = target.image.copy()
+    tempImg3 = target.image.copy()
+    tempImg1.set_alpha(64)
+    tempImg2.set_alpha(122)
+    tempImg3.set_alpha(32)
+    if game.freezeUpdate != freezeUpdate and not game.moribund and not game.victorious:
+        animationIndex = 0
+        game.freezeUpdate = freezeUpdate
+        while animationIndex < 3:
+            if game.haste: break
+            animationIndex += speed
+            if 1 <= animationIndex < 2:
+                target.image = tempImg1
+            if 2 <= animationIndex < 3:
+                target.image = tempImg2
+            else: target.image = tempImg3
+            target.image.set_colorkey(YELLOW)
+            game.events()
+            game.update()
+            game.draw()
+        game.freezeUpdate = None
+
+def wait(time, function_one=None):
+    now = pg.time.get_ticks()
+    last_wait = pg.time.get_ticks()
+    while now < time + last_wait: 
+        if function_one == None: 
+            for event in pg.event.get(): pass
+        else: 
+            function_one()
+        now = pg.time.get_ticks()
